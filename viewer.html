@@ -3,236 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Nexus 3D | Medical Spatial Holography & Volume Viewer</title>
+  <title>Full 3D Anatomy Volume Viewer</title>
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-dark: #06080d;
-      --panel-bg: rgba(13, 17, 26, 0.78);
-      --panel-border: rgba(255, 255, 255, 0.12);
-      --accent-cyan: #00f2fe;
-      --accent-blue: #4facfe;
-      --accent-amber: #f59e0b;
-      --accent-emerald: #10b981;
-      --accent-purple: #a855f7;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-    }
-
-    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-    html, body {
-      margin: 0; padding: 0; width: 100%; height: 100%;
-      overflow: hidden; background: var(--bg-dark);
-      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
-      color: var(--text-main);
-    }
-
-    /* Background AR Video Feed */
-    #ar-video {
-      position: absolute; inset: 0; width: 100vw; height: 100vh;
-      object-fit: cover; z-index: 0; opacity: 0; pointer-events: none;
-      transition: opacity 0.4s ease;
-    }
-    #ar-video.active { opacity: 1; }
-
-    /* WebGL Canvas */
-    #canvas {
-      position: absolute; inset: 0; width: 100vw; height: 100vh;
-      display: block; touch-action: none; z-index: 1;
-    }
-
-    /* SVG 6DoF Tangible Slicing Overlay Frame Gizmo */
-    #slicing-gizmo-svg {
-      position: absolute; inset: 0; width: 100vw; height: 100vh;
-      pointer-events: none; z-index: 2; display: none;
-    }
-    #slicing-gizmo-svg.active { display: block; }
-
-    /* Top Navigation Header */
-    header {
-      position: absolute; top: 16px; left: 16px; right: 16px;
-      display: flex; justify-content: space-between; align-items: center;
-      z-index: 10; pointer-events: none;
-    }
-    .brand {
-      pointer-events: auto; display: flex; align-items: center; gap: 10px;
-      background: var(--panel-bg); backdrop-filter: blur(16px);
-      border: 1px solid var(--panel-border); padding: 10px 18px; border-radius: 14px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-    .brand-icon {
-      width: 24px; height: 24px; border-radius: 6px;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-      display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #000;
-    }
-    .brand-title {
-      font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700;
-      letter-spacing: 0.04em; background: linear-gradient(to right, #fff, var(--accent-cyan));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    }
-    .status-pills {
-      display: flex; gap: 8px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end;
-    }
-    .status-pill {
-      background: var(--panel-bg); backdrop-filter: blur(12px);
-      border: 1px solid var(--panel-border); padding: 6px 12px; border-radius: 20px;
-      font-size: 0.72rem; font-weight: 500; color: var(--text-muted);
-      display: flex; align-items: center; gap: 6px; transition: all 0.3s ease;
-    }
-    .status-pill.active {
-      border-color: var(--accent-cyan); color: var(--text-main);
-      box-shadow: 0 0 12px rgba(0, 242, 254, 0.25);
-    }
-    .status-dot {
-      width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);
-    }
-    .status-pill.active .status-dot {
-      background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan);
-    }
-
-    /* Main Floating Controls Sidebar */
-    .panel {
-      position: absolute; top: 76px; left: 16px;
-      background: var(--panel-bg); backdrop-filter: blur(16px);
-      border: 1px solid var(--panel-border); border-radius: 16px;
-      padding: 18px; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 100px);
-      overflow-y: auto; z-index: 10; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-      transition: transform 0.3s ease, opacity 0.3s ease;
-    }
-    .panel::-webkit-scrollbar { width: 4px; }
-    .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-
-    .section-header {
-      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: var(--accent-cyan); margin: 14px 0 8px 0;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .section-header:first-child { margin-top: 0; }
-
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-
-    /* Interactive Buttons & Segmented Tabs */
-    .mode-btn, .axis-btn, .preset-btn {
-      background: rgba(30, 41, 59, 0.7); border: 1px solid var(--panel-border);
-      color: var(--text-muted); padding: 8px 10px; border-radius: 10px;
-      font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease;
-      display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
-    }
-    .mode-btn:hover, .axis-btn:hover, .preset-btn:hover {
-      background: rgba(51, 65, 85, 0.8); color: var(--text-main); border-color: rgba(255,255,255,0.25);
-    }
-    .mode-btn.active, .axis-btn.active, .preset-btn.active {
-      background: linear-gradient(135deg, rgba(0, 242, 254, 0.15), rgba(79, 172, 254, 0.25));
-      border-color: var(--accent-cyan); color: #fff; font-weight: 600;
-      box-shadow: 0 4px 14px rgba(0, 242, 254, 0.2);
-    }
-
-    /* Sliders & Form Inputs */
-    .row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
-    .label-line { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); }
-    .val-badge { color: var(--accent-cyan); font-weight: 600; font-family: monospace; }
-    
-    input[type="range"] {
-      width: 100%; height: 5px; border-radius: 5px;
-      background: #1e293b; accent-color: var(--accent-cyan); cursor: pointer;
-    }
-
-    select, .upload-btn {
-      width: 100%; background: rgba(30, 41, 59, 0.8);
-      border: 1px solid var(--panel-border); color: #fff; padding: 10px 12px;
-      border-radius: 10px; font-size: 0.82rem; font-family: inherit; outline: none;
-    }
-    .upload-btn {
-      display: block; text-align: center; background: linear-gradient(135deg, #0284c7, #0369a1);
-      cursor: pointer; position: relative; overflow: hidden; margin-top: 6px; font-weight: 600;
-      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3); transition: all 0.2s ease;
-    }
-    .upload-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .upload-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-
-    /* Right Margin Touch HUD Quick Controls */
-    .touch-hud-right {
-      position: absolute; right: 16px; top: 76px; display: flex;
-      flex-direction: column; gap: 10px; z-index: 10; pointer-events: auto;
-    }
-    .hud-btn {
-      width: 44px; height: 44px; border-radius: 14px;
-      background: var(--panel-bg); backdrop-filter: blur(14px);
-      border: 1px solid var(--panel-border); color: var(--text-main);
-      display: grid; place-items: center; cursor: pointer;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.4); transition: all 0.2s ease;
-    }
-    .hud-btn:hover { background: rgba(30, 41, 59, 0.9); border-color: var(--accent-cyan); transform: scale(1.05); }
-    .hud-btn.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,242,254,0.15); }
-    .hud-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-    /* Touch Gesture Info Banner & Touch Indicator HUD */
-    #gesture-hud {
-      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: rgba(10, 14, 23, 0.85); backdrop-filter: blur(14px);
-      border: 1px solid var(--panel-border); padding: 8px 18px; border-radius: 30px;
-      font-size: 0.78rem; color: var(--text-muted); pointer-events: none; z-index: 10;
-      display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-    }
-    .gesture-item { display: flex; align-items: center; gap: 6px; }
-    .gesture-key { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; font-weight: 600; color: var(--accent-cyan); font-size: 0.7rem; }
-
-    /* File / Error Banner */
-    #file-banner {
-      display: none; position: absolute; top: 76px; right: 70px;
-      max-width: 360px; background: rgba(120, 53, 15, 0.92);
-      border: 1px solid rgba(251,191,36,0.5); border-radius: 14px; padding: 14px 16px;
-      font-size: 0.8rem; line-height: 1.45; color: #fef3c7; z-index: 20;
-    }
-    #file-banner strong { color: #fbbf24; }
-    #file-banner a { color: #7dd3fc; font-weight: 600; }
-    #file-banner code { background: rgba(0,0,0,0.35); padding: 1px 5px; border-radius: 4px; }
-
-    /* Holographic Stereo Overlay Grid Effect */
-    .holo-grid {
-      position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: 0;
-      background: radial-gradient(circle at center, transparent 40%, rgba(0, 242, 254, 0.08) 100%),
-                  linear-gradient(rgba(0, 242, 254, 0.03) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(0, 242, 254, 0.03) 1px, transparent 1px);
-      background-size: 100% 100%, 40px 40px, 40px 40px;
-      transition: opacity 0.5s ease;
-    }
-    .holo-grid.active { opacity: 1; }
-
-    @media (max-width: 768px) {
-      .panel { width: calc(100vw - 32px); max-height: 50vh; }
-      #file-banner { right: 16px; top: auto; bottom: 80px; }
-      #gesture-hud { width: calc(100vw - 32px); justify-content: center; font-size: 0.7rem; }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
   <script src="https://unpkg.com/@niivue/niivue@0.69.0/dist/niivue.umd.js"></script>
 </head>
 <body>
+
   <!-- Background AR Camera Stream -->
   <video id="ar-video" autoplay playsinline muted></video>
 
-  <!-- WebGL Holographic Volume Canvas -->
-  <canvas id="canvas"></canvas>
+  <!-- WebGL Volume Canvas -->
+  <canvas id="gl-canvas"></canvas>
 
-  <!-- 6DoF Tangible Slicing Frame SVG Gizmo Overlay -->
+  <!-- Autostereoscopic Holographic Grid -->
+  <div class="holo-grid" id="holo-grid"></div>
+
+  <!-- SVG 6DoF Tangible Slicing Gizmo Overlay -->
   <svg id="slicing-gizmo-svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-    <polygon id="gizmo-quad" points="250,250 750,250 750,750 250,750" fill="rgba(0, 242, 254, 0.08)" stroke="#00f2fe" stroke-width="3" stroke-dasharray="8 4" />
-    <circle id="gizmo-center" cx="500" cy="500" r="10" fill="#00f2fe" />
+    <polygon id="gizmo-quad" points="250,250 750,250 750,750 250,750" fill="rgba(56, 189, 248, 0.08)" stroke="#38bdf8" stroke-width="3" stroke-dasharray="8 4" />
+    <circle id="gizmo-center" cx="500" cy="500" r="10" fill="#38bdf8" />
     <line id="gizmo-normal" x1="500" y1="500" x2="500" y2="400" stroke="#f59e0b" stroke-width="3" />
     <text id="gizmo-label" x="515" y="395" fill="#f59e0b" font-size="16" font-weight="bold">6DoF Tangible Slicing Plane</text>
   </svg>
 
-  <div class="holo-grid" id="holo-grid"></div>
+  <!-- Loading Modal Banner -->
+  <div id="loader" class="loading-banner">Loading 3D Anatomy Volume...</div>
 
-  <!-- Top Navigation Bar -->
+  <!-- Top Navigation Header -->
   <header>
     <div class="brand">
       <div class="brand-icon">3D</div>
-      <div class="brand-title">NEXUS 3D SPATIAL HOLOGRAPHY</div>
+      <div class="brand-title">FULL 3D ANATOMY VIEWER</div>
     </div>
     <div class="status-pills">
       <div class="status-pill active" id="pill-raymarch">
@@ -247,98 +52,145 @@
     </div>
   </header>
 
-  <!-- Sidebar Control Panel -->
-  <div class="panel">
-    <div class="section-header">
-      <span>Spatial Tracking & Slicing Mode</span>
-    </div>
-    <div class="grid-2" id="slicing-modes">
-      <button class="mode-btn active" data-mode="standard">
-        <strong>Standard Axis</strong>
-        <span style="font-size: 0.68rem; opacity: 0.7">Axial/Coronal/Sagittal</span>
-      </button>
-      <button class="mode-btn" data-mode="prop6dof">
-        <strong>6DoF Frame Prop</strong>
-        <span style="font-size: 0.68rem; opacity: 0.7">Tangible Antilatency</span>
-      </button>
-      <button class="mode-btn" data-mode="arwindow">
-        <strong>AR Device Window</strong>
-        <span style="font-size: 0.68rem; opacity: 0.7">iPad AR Screen Slice</span>
-      </button>
-      <button class="mode-btn" data-mode="holographic">
-        <strong>Holographic 3D</strong>
-        <span style="font-size: 0.68rem; opacity: 0.7">Autostereoscopic Depth</span>
-      </button>
+  <!-- Touch Glassmorphic Control Panel -->
+  <div class="ui-panel">
+    <div class="panel-header">
+      <h2>3D Anatomy Viewer</h2>
+      <span class="badge" id="slice-counter">Full 3D Brain</span>
     </div>
 
-    <!-- 6DoF Tangible Prop Tracker Controls -->
-    <div id="prop-controls" style="display: none; margin-top: 10px;">
-      <div class="section-header">6DoF Physical Prop Tracking Gizmo</div>
-      <div class="row">
-        <div class="label-line"><span>Pitch (Tilt X)</span><span class="val-badge" id="pitch-txt">0°</span></div>
+    <!-- Quick Load Preset Volumes -->
+    <div class="control-group">
+      <div class="label-row">
+        <span>Load Full 3D Reference Scans</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <button id="load-brain" class="btn-action">Full Brain MRI</button>
+        <button id="load-head" class="btn-action">Skull & Head CT</button>
+      </div>
+    </div>
+
+    <!-- Slice Clipping Depth -->
+    <div class="control-group">
+      <div class="label-row">
+        <span>Cross-Section Slicing</span>
+        <span id="depth-txt" class="val-readout">0 mm</span>
+      </div>
+      <input type="range" id="clip-slider" min="-150" max="150" value="0" step="1">
+    </div>
+
+    <!-- Plane Orientation Axis Buttons -->
+    <div class="control-group" id="standard-slice-controls">
+      <div class="label-row">
+        <span>Plane Orientation</span>
+      </div>
+      <div class="axis-grid" id="axis-btns">
+        <button class="btn-pill active" data-axis="axial">Axial (Z)</button>
+        <button class="btn-pill" data-axis="coronal">Coronal (Y)</button>
+        <button class="btn-pill" data-axis="sagittal">Sagittal (X)</button>
+      </div>
+    </div>
+
+    <!-- Spatial Slicing & Holography Modes -->
+    <div class="control-group">
+      <div class="label-row">
+        <span>Slicing & Tracking Mode</span>
+      </div>
+      <div class="grid-2" id="slicing-modes">
+        <button class="mode-btn active" data-mode="standard">
+          <strong>Standard Axis</strong>
+          <span>Axial/Coronal/Sagittal</span>
+        </button>
+        <button class="mode-btn" data-mode="prop6dof">
+          <strong>6DoF Prop</strong>
+          <span>Tangible Frame</span>
+        </button>
+        <button class="mode-btn" data-mode="arwindow">
+          <strong>AR Device</strong>
+          <span>Camera Stream</span>
+        </button>
+        <button class="mode-btn" data-mode="holographic">
+          <strong>Holographic</strong>
+          <span>Autostereoscopic</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 6DoF Physical Prop Gizmo Controls -->
+    <div id="prop-controls" style="display: none;">
+      <div class="control-group">
+        <div class="label-row"><span>Pitch (Tilt X)</span><span id="pitch-txt" class="val-readout">0°</span></div>
         <input type="range" id="pitch-slider" min="-90" max="90" value="0" step="1">
       </div>
-      <div class="row">
-        <div class="label-line"><span>Yaw (Rotate Y)</span><span class="val-badge" id="yaw-txt">0°</span></div>
+      <div class="control-group">
+        <div class="label-row"><span>Yaw (Rotate Y)</span><span id="yaw-txt" class="val-readout">0°</span></div>
         <input type="range" id="yaw-slider" min="-180" max="180" value="0" step="1">
       </div>
-      <div class="row">
-        <div class="label-line"><span>Roll (Spin Z)</span><span class="val-badge" id="roll-txt">0°</span></div>
+      <div class="control-group">
+        <div class="label-row"><span>Roll (Spin Z)</span><span id="roll-txt" class="val-readout">0°</span></div>
         <input type="range" id="roll-slider" min="-90" max="90" value="0" step="1">
       </div>
     </div>
 
-    <!-- Standard Slice Plane Controls -->
-    <div id="standard-slice-controls">
-      <div class="section-header">Plane Orientation</div>
-      <div class="axes" id="axis-btns">
-        <button class="axis-btn active" data-axis="axial">Axial (Z)</button>
-        <button class="axis-btn" data-axis="coronal">Coronal (Y)</button>
-        <button class="axis-btn" data-axis="sagittal">Sagittal (X)</button>
+    <!-- Anatomical Tissue Isolation Presets -->
+    <div class="control-group">
+      <div class="label-row">
+        <span>Tissue Isolation (Preset)</span>
       </div>
-    </div>
-
-    <div class="row" style="margin-top: 12px;">
-      <div class="label-line">
-        <span>Clip Plane Depth Offset</span>
-        <span class="val-badge" id="depth-txt">0 mm</span>
-      </div>
-      <input type="range" id="clip-slider" min="-140" max="140" value="0" step="1">
-    </div>
-
-    <div class="section-header">Anatomical Boundary Shading</div>
-    <div class="row">
-      <div class="label-line"><span>Transfer Function Presets</span></div>
-      <select id="cmap">
-        <option value="gray">Grayscale (Standard MRI)</option>
-        <option value="bone">Cortical Bone & Skull</option>
-        <option value="plasma">Vascular & Blood Flow (Plasma)</option>
-        <option value="turbo">Brain Tissue & Ventricles (Turbo)</option>
-        <option value="actc">PET/SPECT Functional Contrast (ACTC)</option>
+      <select id="tissue-preset">
+        <option value="all" selected>Full Density Volume</option>
+        <option value="bone">Bone / Hard Skeletal Surface</option>
+        <option value="soft">Soft Tissue & Brain Gray/White Matter</option>
+        <option value="angio">Vascular / Contrast Enhanced</option>
+        <option value="lung">Pulmonary / Lung Cavity</option>
       </select>
     </div>
 
-    <div class="row">
-      <div class="label-line"><span>Tissue Density Threshold</span><span class="val-badge" id="thresh-txt">Standard</span></div>
+    <!-- Transfer Function Shader -->
+    <div class="control-group">
+      <div class="label-row">
+        <span>Color Transfer Function</span>
+      </div>
+      <select id="cmap-select">
+        <option value="gray" selected>Grayscale (Standard MRI/CT)</option>
+        <option value="bone">Bone / Ivory</option>
+        <option value="plasma">Plasma Density</option>
+        <option value="turbo">Turbo High-Contrast</option>
+        <option value="ct_kidneys">Renal / Vascular</option>
+        <option value="copper">Copper Anatomical</option>
+      </select>
+    </div>
+
+    <!-- Density Cutoff Threshold Slider -->
+    <div class="control-group">
+      <div class="label-row">
+        <span>Density Threshold</span>
+        <span id="thresh-txt" class="val-readout">50%</span>
+      </div>
       <input type="range" id="thresh-slider" min="0" max="100" value="50" step="1">
     </div>
 
-    <div class="section-header">Data Source</div>
-    <label class="upload-btn">
-      <span id="upload-label">Open Local .nii / .nii.gz / .dcm</span>
-      <input type="file" id="file-pick" multiple accept=".nii,.nii.gz,.mgz,.mgh,.nrrd,.nhdr,.mha,.mhd,.dcm,.dicom">
-    </label>
+    <!-- Local File & Multi-File Upload (.nii, .nii.gz, .dcm) -->
+    <div class="control-group">
+      <label class="upload-btn">
+        Upload Scan (.nii / .nii.gz / Select ALL .dcm)
+        <input type="file" id="file-pick" multiple accept=".nii,.nii.gz,.dcm,.dicom,.mgz,.nrrd">
+      </label>
+      <span class="upload-hint">
+        For DICOM, press Ctrl+A (Cmd+A) to select all slices at once
+      </span>
+    </div>
   </div>
 
-  <!-- Touch HUD Margin Buttons -->
+  <!-- Right Margin Touch HUD Quick Controls -->
   <div class="touch-hud-right">
-    <button class="hud-btn" id="btn-reset" title="Reset Anchor Position">
+    <button class="hud-btn" id="btn-reset" title="Reset Camera View & Plane">
       <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
     </button>
     <button class="hud-btn" id="btn-ar-toggle" title="Toggle AR Camera Window">
       <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
     </button>
-    <button class="hud-btn" id="btn-holo-toggle" title="Toggle Autostereoscopic Parallax">
+    <button class="hud-btn" id="btn-holo-toggle" title="Toggle Autostereoscopic Holography">
       <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
     </button>
     <button class="hud-btn" id="btn-fullscreen" title="Toggle Fullscreen">
@@ -346,375 +198,21 @@
     </button>
   </div>
 
-  <!-- Touch Gesture Info Banner & Touch Indicator HUD -->
-  <div id="gesture-hud">
-    <div class="gesture-item"><span class="gesture-key">1-Finger</span> Orbit Scan</div>
-    <div class="gesture-item"><span class="gesture-key">Pinch</span> Scale Volume</div>
-    <div class="gesture-item"><span class="gesture-key">2-Finger Drag</span> Pin & Translate Anchor</div>
+  <!-- Gesture Hints HUD -->
+  <div id="gesture-hints">
+    <div class="gesture-item"><span class="gesture-key">1-Finger</span> Rotate</div>
+    <div class="gesture-item"><span class="gesture-key">Pinch</span> Zoom</div>
+    <div class="gesture-item"><span class="gesture-key">2-Finger</span> Pan</div>
   </div>
 
+  <!-- Server Protocol Alert Banner -->
   <div id="file-banner" role="alert">
     <strong>Opened as a file.</strong> 3D scans (.nii) work, but DICOM (.dcm) needs the local server.<br>
     Start it with <code>start-viewer.bat</code> (in the MRI folder), then open
     <a href="http://localhost:8000/">http://localhost:8000/</a>
   </div>
 
-  <script>
-    // File protocol redirect check
-    if (location.protocol === "file:") {
-      const banner = document.getElementById("file-banner");
-      const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 2500);
-      fetch("http://localhost:8000/index.html", { mode: "no-cors", cache: "no-store", signal: ctrl.signal })
-        .then(() => location.replace("http://localhost:8000/"))
-        .catch(() => { banner.style.display = "block"; });
-    }
-
-    // DOM Elements
-    const canvas = document.getElementById("canvas");
-    const slider = document.getElementById("clip-slider");
-    const depthTxt = document.getElementById("depth-txt");
-    const pitchSlider = document.getElementById("pitch-slider");
-    const yawSlider = document.getElementById("yaw-slider");
-    const rollSlider = document.getElementById("roll-slider");
-    const pitchTxt = document.getElementById("pitch-txt");
-    const yawTxt = document.getElementById("yaw-txt");
-    const rollTxt = document.getElementById("roll-txt");
-    const threshSlider = document.getElementById("thresh-slider");
-    const threshTxt = document.getElementById("thresh-txt");
-    const cmap = document.getElementById("cmap");
-    const filePick = document.getElementById("file-pick");
-    const axisBtns = document.querySelectorAll("#axis-btns button");
-    const modeBtns = document.querySelectorAll("#slicing-modes button");
-    const propControls = document.getElementById("prop-controls");
-    const standardSliceControls = document.getElementById("standard-slice-controls");
-    const arVideo = document.getElementById("ar-video");
-    const holoGrid = document.getElementById("holo-grid");
-    const slicingGizmoSvg = document.getElementById("slicing-gizmo-svg");
-    const pillMode = document.getElementById("pill-mode");
-    const pillHolo = document.getElementById("pill-holo");
-
-    // Initialize NiiVue Instance
-    const nv = new niivue.Niivue({
-      backColor: [0.03, 0.04, 0.06, 1.0],
-      show3Dcrosshair: false,
-      loadingText: 'Initializing Volumetric Raymarcher...'
-    });
-
-    nv.attachToCanvas(canvas);
-    nv.setSliceType(nv.sliceTypeRender);
-
-    // State Variables
-    let currentMode = 'standard'; // 'standard', 'prop6dof', 'arwindow', 'holographic'
-    let currentAxis = 'axial';
-    let isArActive = false;
-    let isHoloActive = false;
-
-    // Plane Update Logic
-    function updatePlane() {
-      const d = parseFloat(slider.value);
-      depthTxt.textContent = d + " mm";
-
-      if (currentMode === 'standard') {
-        if (currentAxis === 'axial') nv.setClipPlane([0, 0, 1, d]);
-        if (currentAxis === 'coronal') nv.setClipPlane([0, 1, 0, d]);
-        if (currentAxis === 'sagittal') nv.setClipPlane([1, 0, 0, d]);
-      } else if (currentMode === 'prop6dof' || currentMode === 'arwindow') {
-        // Calculate 6DoF Normal Vector from Pitch, Yaw, Roll
-        const pitch = parseFloat(pitchSlider.value) * (Math.PI / 180);
-        const yaw = parseFloat(yawSlider.value) * (Math.PI / 180);
-
-        pitchTxt.textContent = pitchSlider.value + "°";
-        yawTxt.textContent = yawSlider.value + "°";
-        rollTxt.textContent = rollSlider.value + "°";
-
-        // Rotated Normal Vector
-        const nx = Math.sin(yaw) * Math.cos(pitch);
-        const ny = -Math.sin(pitch);
-        const nz = Math.cos(yaw) * Math.cos(pitch);
-
-        nv.setClipPlane([nx, ny, nz, d]);
-        updateGizmoOverlay(nx, ny, nz, d);
-      }
-    }
-
-    // Update 6DoF Gizmo SVG Overlay
-    function updateGizmoOverlay(nx, ny, nz, d) {
-      if (currentMode !== 'prop6dof') {
-        slicingGizmoSvg.classList.remove('active');
-        return;
-      }
-      slicingGizmoSvg.classList.add('active');
-
-      const cx = 500 + nx * d * 1.5;
-      const cy = 500 + ny * d * 1.5;
-      const size = 250;
-
-      const p1 = `${cx - size},${cy - size}`;
-      const p2 = `${cx + size},${cy - size}`;
-      const p3 = `${cx + size},${cy + size}`;
-      const p4 = `${cx - size},${cy + size}`;
-
-      document.getElementById('gizmo-quad').setAttribute('points', `${p1} ${p2} ${p3} ${p4}`);
-      document.getElementById('gizmo-center').setAttribute('cx', cx);
-      document.getElementById('gizmo-center').setAttribute('cy', cy);
-      document.getElementById('gizmo-normal').setAttribute('x1', cx);
-      document.getElementById('gizmo-normal').setAttribute('y1', cy);
-      document.getElementById('gizmo-normal').setAttribute('x2', cx + nx * 100);
-      document.getElementById('gizmo-normal').setAttribute('y2', cy + ny * 100);
-    }
-
-    // Default sample brain volume
-    nv.loadVolumes([{
-      url: "https://niivue.github.io/niivue-demo-images/mni152.nii.gz",
-      colormap: "gray"
-    }]).then(() => {
-      nv.setSliceType(nv.sliceTypeRender);
-      updatePlane();
-    });
-
-    // Control Listeners
-    slider.addEventListener("input", updatePlane);
-    pitchSlider.addEventListener("input", updatePlane);
-    yawSlider.addEventListener("input", updatePlane);
-    rollSlider.addEventListener("input", updatePlane);
-
-    // Mode Selection Handler
-    modeBtns.forEach(b => {
-      b.addEventListener("click", () => {
-        modeBtns.forEach(x => x.classList.remove("active"));
-        b.classList.add("active");
-        currentMode = b.dataset.mode;
-        
-        // Update UI Visibility
-        propControls.style.display = (currentMode === 'prop6dof') ? 'block' : 'none';
-        standardSliceControls.style.display = (currentMode === 'standard') ? 'block' : 'none';
-        
-        pillMode.innerHTML = `<span class="status-dot"></span> Mode: ${b.querySelector('strong').textContent}`;
-        pillMode.classList.add('active');
-
-        if (currentMode === 'arwindow') {
-          toggleAR(true);
-        } else if (currentMode === 'holographic') {
-          toggleHolographic(true);
-        } else {
-          slicingGizmoSvg.classList.remove('active');
-        }
-
-        updatePlane();
-      });
-    });
-
-    // Axis Selection
-    axisBtns.forEach(b => {
-      b.addEventListener("click", () => {
-        axisBtns.forEach(x => x.classList.remove("active"));
-        b.classList.add("active");
-        currentAxis = b.dataset.axis;
-        updatePlane();
-      });
-    });
-
-    // Transfer Functions / Boundary Shading
-    cmap.addEventListener("change", (e) => {
-      if (nv.volumes.length) {
-        nv.setColorMap(nv.volumes[0].id, e.target.value);
-        nv.updateGLVolume();
-      }
-    });
-
-    threshSlider.addEventListener("input", (e) => {
-      const val = parseInt(e.target.value);
-      threshTxt.textContent = val + "%";
-      if (nv.volumes.length) {
-        const vol = nv.volumes[0];
-        const minVal = vol.cal_min || 0;
-        const maxVal = vol.cal_max || 100;
-        const adjustedMin = minVal + (maxVal - minVal) * (val / 100) * 0.4;
-        nv.setCalMinMax(vol.id, adjustedMin, maxVal);
-      }
-    });
-
-    // AR Camera Slicing Toggle
-    async function toggleAR(enable) {
-      isArActive = (enable !== undefined) ? enable : !isArActive;
-      document.getElementById('btn-ar-toggle').classList.toggle('active', isArActive);
-
-      if (isArActive) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          arVideo.srcObject = stream;
-          arVideo.classList.add('active');
-          nv.setOption('backColor', [0, 0, 0, 0]); // Transparent canvas background
-        } catch (err) {
-          console.warn("Camera AR not available:", err);
-          alert("AR Video Feed: Camera permission denied or not available on this device.");
-          isArActive = false;
-          document.getElementById('btn-ar-toggle').classList.remove('active');
-        }
-      } else {
-        if (arVideo.srcObject) {
-          arVideo.srcObject.getTracks().forEach(t => t.stop());
-          arVideo.srcObject = null;
-        }
-        arVideo.classList.remove('active');
-        nv.setOption('backColor', [0.03, 0.04, 0.06, 1.0]);
-      }
-    }
-    document.getElementById('btn-ar-toggle').addEventListener('click', () => toggleAR());
-
-    // Holographic Autostereoscopic Parallax Toggle
-    function toggleHolographic(enable) {
-      isHoloActive = (enable !== undefined) ? enable : !isHoloActive;
-      document.getElementById('btn-holo-toggle').classList.toggle('active', isHoloActive);
-      holoGrid.classList.toggle('active', isHoloActive);
-      pillHolo.classList.toggle('active', isHoloActive);
-    }
-    document.getElementById('btn-holo-toggle').addEventListener('click', () => toggleHolographic());
-
-    // Mouse Parallax Effect for Autostereoscopic 3D
-    window.addEventListener('mousemove', (e) => {
-      if (!isHoloActive) return;
-      const mouseX = (e.clientX / window.innerWidth) - 0.5;
-      const mouseY = (e.clientY / window.innerHeight) - 0.5;
-      nv.scene.renderAzimuth = mouseX * 30;
-      nv.scene.renderElevation = mouseY * 30;
-      nv.drawScene();
-    });
-
-    // Gyroscope Tracking for Mobile AR Device Slicing & Parallax
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', (e) => {
-        if (currentMode === 'arwindow' || isHoloActive) {
-          if (e.beta !== null && e.gamma !== null) {
-            pitchSlider.value = Math.round(e.beta - 45);
-            yawSlider.value = Math.round(e.gamma);
-            updatePlane();
-          }
-        }
-      });
-    }
-
-    // Touch Direct Manipulation (Dual-Hand Scale, Rotate, Translate)
-    let initialPinchDist = 0;
-
-    canvas.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        initialPinchDist = Math.sqrt(dx * dx + dy * dy);
-      }
-    });
-
-    canvas.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 2 && initialPinchDist > 0) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const currentDist = Math.sqrt(dx * dx + dy * dy);
-        const scaleFactor = currentDist / initialPinchDist;
-
-        if (nv.scene) {
-          nv.scene.volScale = (nv.scene.volScale || 1.0) * (scaleFactor > 1 ? 1.02 : 0.98);
-          nv.drawScene();
-        }
-      }
-    });
-
-    canvas.addEventListener('touchend', () => { initialPinchDist = 0; });
-
-    // Reset Anchor Button
-    document.getElementById('btn-reset').addEventListener('click', () => {
-      slider.value = 0;
-      pitchSlider.value = 0;
-      yawSlider.value = 0;
-      rollSlider.value = 0;
-      threshSlider.value = 50;
-      updatePlane();
-      if (nv.volumes.length) nv.resetScene();
-    });
-
-    // Fullscreen Toggle
-    document.getElementById('btn-fullscreen').addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-      } else {
-        document.exitFullscreen();
-      }
-    });
-
-    // DICOM -> NIfTI conversion (dcm2niix WASM)
-    const DCM2NIIX_URL = new URL("./vendor/dcm2niix/index.js", location.href).href;
-    let dicomLoaderPromise = null;
-
-    async function initDcm2niix() {
-      if (location.protocol === "file:") {
-        throw new Error(
-          "DICOM conversion needs the page to be served over http. " +
-          "Double-click start-viewer.bat (or run `node serve.js`) and open http://localhost:8000/ instead of opening the file directly."
-        );
-      }
-      const { Dcm2niix } = await import(DCM2NIIX_URL);
-      const dcm2niix = new Dcm2niix();
-      await dcm2niix.init();
-      return dcm2niix;
-    }
-
-    function getDicomLoader() {
-      if (!dicomLoaderPromise) {
-        dicomLoaderPromise = initDcm2niix()
-          .then(dcm2niix => async (files) => {
-            const out = await dcm2niix.input(files).run();
-            const nii = out.filter(f => /\.nii(\.gz)?$/i.test(f.name));
-            return Promise.all(nii.map(async f => ({ name: f.name, data: await f.arrayBuffer() })));
-          })
-          .catch(err => { dicomLoaderPromise = null; throw err; });
-      }
-      return dicomLoaderPromise;
-    }
-
-    function replaceVolumes() {
-      [...nv.volumes].forEach(v => v && nv.removeVolume(v));
-    }
-
-    const isDicom = f => /\.(dcm|dicom)$/i.test(f.name);
-
-    console.info("[viewer] build: nexus-3d-spatial-holography v5");
-
-    filePick.addEventListener("change", async (e) => {
-      const files = Array.from(e.target.files || []);
-      if (!files.length) return;
-
-      console.group("[viewer] loading " + files.length + " file(s)");
-      files.slice(0, 5).forEach(f => console.log("file:", f.name, "| size:", f.size, "bytes | type:", f.type || "(none)", "| dicom:", isDicom(f)));
-      if (files.length > 5) console.log("... and " + (files.length - 5) + " more");
-
-      try {
-        if (files.some(isDicom)) {
-          console.log("route: DICOM -> dcm2niix -> NIfTI");
-          const dicomLoader = await getDicomLoader();
-          const converted = await dicomLoader(files.filter(isDicom));
-          console.log("converted volumes:", converted.map(c => c.name + " (" + c.data.byteLength + " bytes)"));
-          if (!converted.length) throw new Error("No volume could be built from the DICOM file(s)");
-          replaceVolumes();
-          await nv.loadFromArrayBuffer(converted[0].data, converted[0].name);
-        } else {
-          console.log("route: nv.loadFromFile");
-          replaceVolumes();
-          await nv.loadFromFile(files[0]);
-        }
-        console.log("loaded OK; volumes now:", nv.volumes.length);
-        nv.setSliceType(nv.sliceTypeRender);
-        updatePlane();
-      } catch (err) {
-        console.error("Error loading volume:", err);
-        alert("Could not load file: " + (err && err.message ? err.message : err));
-      } finally {
-        console.groupEnd();
-        filePick.value = "";
-      }
-    });
-
-    window.addEventListener("resize", () => nv.resizeListener());
-  </script>
+  <!-- Main JavaScript -->
+  <script src="app.js"></script>
 </body>
 </html>
